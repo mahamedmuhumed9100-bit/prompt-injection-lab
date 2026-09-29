@@ -2,7 +2,13 @@
 
 ![tests](https://github.com/mahamedmuhumed9100-bit/prompt-injection-lab/actions/workflows/tests.yml/badge.svg)
 
+Created by **Mahamed Aamin**, a first-year Computer Science student building hands-on projects in cyber security and AI security.
+
 A small experiment that attacks an LLM chatbot with prompt injections, switches on common defences one at a time, and measures how often the bot still leaks a secret.
+
+![The lab's web page: the bot leaks its secret spelled out with spaces, which gets past the output filter](docs/demo.jpg)
+
+*The output filter blocks the secret written normally, but asking the bot to spell it out with spaces gets it straight past.*
 
 ## Why this matters
 
@@ -49,6 +55,7 @@ Every prompt is sent several times under each defence configuration, because LLM
 | [`lab/scoring.py`](lab/scoring.py) | Decides whether a reply leaked the secret |
 | [`lab/runner.py`](lab/runner.py) | Runs every prompt against every configuration |
 | [`lab/report.py`](lab/report.py) | Writes the CSV and the summary tables |
+| [`lab/web.py`](lab/web.py) + [`demo.html`](lab/demo.html) | A local web page for trying attacks by hand |
 
 ### Defences
 
@@ -102,6 +109,15 @@ pytest                               # run the tests
 
 Results go to `results/results.csv` (every attempt, including the full reply) and `results/report.md` (summary tables). A full run on a laptop without a GPU can take a while, so start with `--trials 1`.
 
+### Try it in your browser
+
+```bash
+python -m lab.web          # then open http://localhost:8000
+python -m lab.web --fake   # no LLM needed
+```
+
+Pick an example attack or write your own, switch defences on and off, and see straight away whether the secret leaked. It uses the same bot, defences and scorer as the experiment, one message at a time. The server only listens on `127.0.0.1`, so other devices on your network can't reach it.
+
 ## Results
 
 Model `llama3.2:3b`, 3 attempts per prompt, run on 2026-09-29. Every attempt, including the full reply, is in [`results/results.csv`](results/results.csv).
@@ -153,3 +169,7 @@ Model `llama3.2:3b`, 3 attempts per prompt, run on 2026-09-29. Every attempt, in
 ## Ethics
 
 This lab only attacks a model running on your own machine with a made-up secret. Only test prompt injection against systems you own or have explicit permission to test.
+
+## About me
+
+I'm **Mahamed Aamin**, a first-year Computer Science student. I'm working towards a career in cyber security, cloud security and AI security, and I learn by building projects like this one. Feedback and ideas are welcome, so feel free to open an issue.

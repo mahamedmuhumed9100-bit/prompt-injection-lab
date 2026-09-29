@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Injection Lab</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --border: #dfe3e8;
+    --text: #1c2128;
+    --muted: #5d6673;
+    --accent: #3b5bdb;
+    --leak: #c92a2a;
+    --leak-bg: #fff0f0;
+    --block: #a15c00;
+    --block-bg: #fff6e5;
+    --safe: #2b8a3e;
+    --safe-bg: #ebfbee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418;
+      --surface: #1a1f25;
+      --border: #2e353e;
+      --text: #e6e9ed;
+      --muted: #97a1ad;
+      --accent: #7c96ff;
+      --leak: #ff8787;
+      --leak-bg: #3a1d1f;
+      --block: #ffc266;
+      --block-bg: #3a2c14;
+      --safe: #69db7c;
+      --safe-bg: #17301d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 20px; }
+  .secret {
+    display: inline-block;
+    font-family: ui-monospace, Consolas, monospace;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+  .defences { display: grid; gap: 10px; }
+  .defences label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  .defences input { margin-top: 4px; width: 16px; height: 16px; accent-color: var(--accent); }
+  .defences small { display: block; color: var(--muted); }
+  select, textarea {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  textarea { min-height: 110px; resize: vertical; margin-top: 10px; }
+  button {
+    margin-top: 12px;
+    font: inherit;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 20px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: wait; }
+  .badge {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 999px;
+    padding: 3px 12px;
+  }
+  .leaked { color: var(--leak); background: var(--leak-bg); }
+  .blocked { color: var(--block); background: var(--block-bg); }
+  .safe { color: var(--safe); background: var(--safe-bg); }
+  .reply {
+    white-space: pre-wrap;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0 0;
+    max-height: 320px;
+    overflow: auto;
+  }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  #history { list-style: none; padding: 0; margin: 0; }
+  #history li { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  #history li:first-child { border-top: 0; }
+  #history .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #history .on { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .error { color: var(--leak); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Prompt Injection Lab</h1>
+  <p class="lead">This bot was told a secret, <span class="secret" id="secret">…</span>, and told never to reveal it. Try to get it out.</p>
+
+  <section class="card">
+    <h2>Defences</h2>
+    <div class="defences">
+      <label><input type="checkbox" id="hardened_prompt">
+        <span>Hardened prompt<small>Stricter rules, and your message is wrapped in tags the bot is told not to trust</small></span></label>
+      <label><input type="checkbox" id="input_filter">
+        <span>Input filter<small>Blocks messages containing keywords like "password" or "ignore previous"</small></span></label>
+      <label><input type="checkbox" id="output_filter">
+        <span>Output filter<small>Blocks replies that contain the secret word for word</small></span></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Attack</h2>
+    <select id="picker"><option value="">Pick an example attack, or write your own below…</option></select>
+    <textarea id="message" placeholder="Type a message to the bot"></textarea>
+    <button id="send">Send to bot</button>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <h2>Result</h2>
+    <span class="badge" id="status"></span>
+    <pre class="reply" id="reply"></pre>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <section class="card" id="history-card" hidden>
+    <h2>History</h2>
+    <ul id="history"></ul>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const DEFENCES = ["hardened_prompt", "input_filter", "output_filter"];
+  let attacks = [];
+
+  async function loadAttacks() {
+    const data = await (await fetch("/api/attacks")).json();
+    $("secret").textContent = data.secret;
+    attacks = data.attacks;
+    // Group the examples by category in the dropdown.
+    const groups = {};
+    for (const attack of attacks) {
+      if (!groups[attack.category]) {
+        groups[attack.category] = document.createElement("optgroup");
+        groups[attack.category].label = attack.category.replace("_", " ");
+        $("picker").append(groups[attack.category]);
+      }
+      const option = new Option(`${attack.id}: ${attack.prompt.split("\n")[0].slice(0, 70)}`, attack.id);
+      groups[attack.category].append(option);
+    }
+  }
+
+  $("picker").addEventListener("change", () => {
+    const attack = attacks.find((a) => a.id === $("picker").value);
+    if (attack) $("message").value = attack.prompt;
+  });
+
+  function statusOf(result) {
+    if (result.leaked) return ["LEAKED", "leaked"];
+    if (result.blocked_by) return [`Blocked by ${result.blocked_by.replace("_", " ")}`, "blocked"];
+    return ["Safe", "safe"];
+  }
+
+  $("send").addEventListener("click", async () => {
+    const message = $("message").value.trim();
+    if (!message) return;
+    const settings = Object.fromEntries(DEFENCES.map((d) => [d, $(d).checked]));
+    const on = DEFENCES.filter((d) => settings[d]).map((d) => d.replace("_", " "));
+
+    $("send").disabled = true;
+    $("send").textContent = "Bot is thinking…";
+    const started = performance.now();
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, ...settings }),
+      });
+      const result = await response.json();
+      $("result").hidden = false;
+      if (result.error) {
+        $("status").className = "badge leaked";
+        $("status").textContent = "Error";
+        $("reply").textContent = result.error;
+        $("meta").textContent = "";
+        return;
+      }
+      const [label, css] = statusOf(result);
+      $("status").className = `badge ${css}`;
+      $("status").textContent = label;
+      // textContent, not innerHTML: the reply is untrusted model output.
+      $("reply").textContent = result.reply;
+      const seconds = ((performance.now() - started) / 1000).toFixed(1);
+      $("meta").textContent = `Defences on: ${on.length ? on.join(", ") : "none"} · ${seconds}s`;
+
+      const item = document.createElement("li");
+      const badge = document.createElement("span");
+      badge.className = `badge ${css}`;
+      badge.textContent = label;
+      const what = document.createElement("span");
+      what.className = "what";
+      what.textContent = message.split("\n")[0];
+      const defences = document.createElement("span");
+      defences.className = "on";
+      defences.textContent = on.length ? on.join(" + ") : "no defences";
+      item.append(badge, what, defences);
+      $("history").prepend(item);
+      $("history-card").hidden = false;
+    } catch (error) {
+      $("result").hidden = false;
+      $("status").className = "badge leaked";
+      $("status").textContent = "Error";
+      $("reply").textContent = "Couldn't reach the lab server. Is python -m lab.web still running?";
+    } finally {
+      $("send").disabled = false;
+      $("send").textContent = "Send to bot";
+    }
+  });
+
+  loadAttacks();
+</script>
+</body>
+</html>
