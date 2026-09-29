@@ -46,7 +46,10 @@ def run_experiment(model, attacks, configs, trials, verbose=False):
                 }
                 results.append(result)
                 if verbose:
-                    print(f"[{len(results):>4}/{total}] {config_name:<16} {attack['id']:<6} {describe(result)}")
+                    # flush=True so progress shows up straight away, even
+                    # when the output is being saved to a file.
+                    print(f"[{len(results):>4}/{total}] {config_name:<16} {attack['id']:<6} {describe(result)}",
+                          flush=True)
     return results
 
 
